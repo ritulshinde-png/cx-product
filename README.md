@@ -8,10 +8,11 @@ A collaborative workspace for the product team — PRDs, data exploration, syste
 
 ```
 cx-product/
-├── requirements/      # Product feature work
+├── requirements/      # Product feature work (PRD, exploration, strategy)
+├── uat/               # Testing, bugs, sign-off during dev cycle
 ├── intelligence/      # Reusable data knowledge base
 ├── designs/           # UI/UX design specs
-├── systems/           # Technical architecture docs
+├── systems/           # Technical architecture docs (HLD, LLD, APIs)
 └── README.md
 ```
 
@@ -21,9 +22,18 @@ Everything related to a product or feature lives here — PRDs, data exploration
 ```
 requirements/
 └── search/
-    ├── auto-suggest-v1.md        # PRD
-    ├── auto-suggest-exploration.md  # Data exploration
-    └── auto-suggest-strategy.md     # Strategy & decisions
+    ├── auto-suggest-v1.md            # PRD
+    ├── auto-suggest-exploration.md   # Data exploration
+    └── auto-suggest-strategy.md      # Strategy & decisions
+```
+
+### `uat/`
+Dev-cycle testing — test scenarios, bug lists, QA checklists, and sign-off tracking. Organized by product area, mirroring `requirements/`.
+
+```
+uat/
+└── search/
+    └── auto-suggest-uat.md     # Test cases, bugs found, sign-off
 ```
 
 ### `intelligence/`
@@ -62,25 +72,12 @@ systems/
 The branch prefix mirrors the top-level folder where the primary work lives.
 
 | Branch | When to use | Example |
-|--------|-------------|---------|
+|--------|-------------|-----------|
 | `requirements/<area>-<feature>` | Working on a product feature (PRD, exploration, strategy) | `requirements/search-auto-suggest` |
+| `uat/<area>-<feature>` | UAT testing, bug tracking during dev cycle | `uat/search-auto-suggest` |
 | `intelligence/<topic>` | Adding shared queries, schemas, or metric definitions | `intelligence/clickhouse-base-queries` |
 | `designs/<area>-<feature>` | Adding design specs or wireframes | `designs/search-results-page` |
 | `systems/<area>-<topic>` | Documenting architecture or APIs | `systems/search-hld` |
-
-### When to Create a Branch
-
-- **New feature or product initiative** → `requirements/<area>-<feature>`
-- **Adding reusable data knowledge** (queries, schemas) → `intelligence/<topic>`
-- **Documenting system architecture** → `systems/<area>-<topic>`
-- **Quick fixes or typos** → commit directly to `main`
-
-### Workflow
-
-1. Create a branch from `main`
-2. Add your docs & commit with clear messages
-3. Push and open a PR for team review
-4. Merge to `main` after approval
 
 ---
 
@@ -95,6 +92,7 @@ Use kebab-case for filenames. Prefix with a category when helpful.
 | PRD | `auto-suggest-v1.md` |
 | Exploration | `auto-suggest-exploration.md` |
 | Strategy | `auto-suggest-strategy.md` |
+| UAT | `auto-suggest-uat.md` |
 | HLD | `HLD-search-service.md` |
 | LLD | `LLD-cart-flow.md` |
 | API Reference | `API-search-endpoints.md` |
