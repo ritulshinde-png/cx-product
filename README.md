@@ -43,7 +43,7 @@ Shared, reusable data knowledge that isn't tied to a single product. Think of it
 intelligence/
 ├── schemas/     # Table & schema documentation
 ├── queries/     # Base SQL queries, reusable templates
-└── metrics/     # Metric definitions & calculation logic
+├── metrics/     # Metric definitions & calculation logic
 ```
 
 ### `designs/`
