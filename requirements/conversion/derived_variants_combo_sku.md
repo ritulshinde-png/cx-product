@@ -86,57 +86,6 @@ We support showing visibility for different variants of products in the app:
   * Percentage-based discounts (e.g., 20% off) are not supported on Derived SKUs.
   * Coupon offers (site-wide or SKU-specific) are not in scope for Derived SKUs.
 
-### Conversion Factors (allowed units)
-
-#### 📏 1. Weight (Base Unit: kg)
-
-| From ↓ / To → | g | kg |
-| :--- | :--- | :--- |
-| **g** | 1 | 0 |
-| **kg** | 1,000 | 1 |
-
-Common values: 100g, 200g, 500g, 1kg, 2kg, 5kg, 10kg
-
-#### 🧴 2. Volume (Base Unit: L)
-
-| From ↓ / To → | ml | L |
-| :--- | :--- | :--- |
-| **ml** | 1 | 0 |
-| **L** | 1,000 | 1 |
-
-Common values: 100ml, 200ml, 500ml, 1L, 2L, 5L
-
-#### 🔢 3. Count / Pieces (Base Unit: pc)
-
-| From ↓ / To → | 1 pc | x pc |
-| :--- | :--- | :--- |
-| **1 pc** | 1 | 1/x |
-| **x pc** | x | 1 |
-
-Common values: 1 pc, 2 pcs, 6 pcs, 12 pcs (dozen), 24 pcs
-
-#### 📦 4. Units (Base Unit: unit)
-
-| From ↓ / To → | unit | pack of N |
-| :--- | :--- | :--- |
-| **unit** | 1 | 1/N |
-| **pack of N** | N | 1 |
-
-Use Case: 1 unit = 1 packet, pouch, bottle, box
-
-### Billing
-
-* At Child SKU level on HTML Bills on App, Samaan, Tez.
-* Inventory to be deducted using conversion ratio (rounding to 3 digits).
-
-### Benchmarking
-
-| Platform | Apple Royal Gala | Watermelon | Notes |
-| :--- | :--- | :--- | :--- |
-| Big Basket | 4 pcs - (520-600g) | 1 pc (1.7-2.5 kg) | |
-| Blinkit | 2 pcs - (300-400g) | 1 pc (2-3 kg) | |
-| Instamart | 2 pcs | | |
-| Zepto | 2 pcs - (300-400g) | 1 pc (2.3-3.8 kg) | |
 
 ### Returns
 
