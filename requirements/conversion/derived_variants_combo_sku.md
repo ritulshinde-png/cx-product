@@ -20,24 +20,19 @@ Currently we have a system on Samaan that allows us to re-package inventory from
 
 We support showing visibility for different variants of products in the app:
 
-1. **Size Variants**
-   * **Pre Packed**: E.g., Atta | 1kg, 5kg, 10kg, 20kg
+1. **Quantity Variants**: Derived quantities from a parent SKU using a conversion factor.
+   * `parent sku * conversion factor = child sku`
+   * `parent sku * price multiplier = child sku price`
    * **Loose (Weight)**: E.g., Potato | 200g, 500g, 1kg, 2kg
-   * **Loose (Size)**: E.g., Watermelon | Small, Medium, Large
-   * **Loose (Count)**: E.g., Banana | 1pc, 3pc, 6pc, 12pc
-2. **Type Variants**
-   * **Colour**: E.g., Mobile | Yellow, Blue, Black
-   * **Pattern**: E.g., Dress | Blue, Brown, Black
-3. **Combo Variants**
-   * **Same Item (Pre Packed)**: E.g., Atta | 1kg, 1kg x 2, 1kg x 3
-   * **Same Item (Loose)**: E.g., Potato | 1kg x 0.2, 1kg, 1kg x 2
-   * **Different Item**: E.g., Chips + Juice + Biscuit | Milk + Bread + Egg
-
-#### Derivation Logic
-
-1. **Pre Packed**: Existing pack sizes of these items. They function as independent SKUs (ex: aata 1kg pack, 5kg pack, 10kg pack).
-2. **Loose**: Quantities derived from a parent SKU based on a conversion factor, making a child SKU (ex: 1kg potato - with a 0.75 conversion factor will create a loose variant of 0.75kg potato).
-3. **Combo**: Derived by combining multiple parent SKUs to make a child SKU (ex: parent 1 * conversion factor + parent 2 * conversion factor = child 1).
+2. **Combo Variants**: Derived quantities from 1 parent SKU or >1 parent SKU using respective conversion factors.
+   * `parent sku 1 * conv factor 1 + ... + parent sku n * conv factor n = child sku`
+   * `parent sku 1 * price multiplier 1 + ... + parent sku n * price multiplier n = child sku`
+   * **Limitation**: Cannot input a conversion factor < 1 in child creation. A combo can only be created from original parent SKUs (child SKUs cannot be used as parents).
+   * **Combo of same single sku**: E.g., Ghadi Detergent | 1kg, 1kg * 2, 1kg * 5
+   * **Combo of >1 unique skus**: E.g., 1 Lays + 1 Cold Drink + 1 Biscuit = 3 combo, 1 Detergent + 1 Handwash = 2 combo
+3. **Type Variants**: Type variants for items with existing packs.
+   * **Quantity type variants**: Items with weight variants. E.g., Ghadi Detergent | 1kg, 2kg, 5kg, 10kg
+   * **Attribute type variants**: Items with different attributes (colour, size, style, pattern, etc.). E.g., Shoes | 6, 7, 9, 13; Tshirt | red, blue, green; Pant | plain, textured, striped; Diaper | pack of 3, pack of 6, pack of 10
 
 ### Catalog & SKU Management
 
@@ -226,23 +221,144 @@ There are 2 states for the [ADD] button on listing and discovery surfaces:
 
 Clicking on the `[ADD | {x} OPTIONS]` button opens a bottom sheet with two distinct zones:
 
-1.  **Vertical Listing**: Items listed one below another (top section).
-2.  **Horizontal Listing**: Items listed in a horizontal row (bottom section).
+#### Bottom Sheet UI Components
+1. **Header**: `{Brand} + {Product Type}`
+2. **Price Logic**:
+    - If No Offer Price (OSP) or Selling Price (SP) → Show **MRP**
+    - If No Offer Price (OSP) → Show **SP** & strike-off **MRP**
+    - If Offer Price (OSP) & Locked → Show **SP** & strike-off **MRP**
+    - If Offer Price (OSP) & Unlocked → Show **OSP** & strike-off **MRP**
+3. **Price / Unit**:
+    - Formula: price normalisation per standard unit (e.g., per 1kg or 1L).
+    - **Highlighting**: The item with the lowest Price/Unit is the "Best Value" indicator. Its Price/Unit text is **Blue**, while others are **Gray**. A dedicated tag with a **Rupee Badge Icon** + text `"Best Value"` is placed immediately next to the primary text.
+4. **Unit Display**: `{Unit Value} + {Unit}` (e.g., `500 g`)
+
+#### Zone 1: Vertical Listing (Primary Variants)
+Items listed one below another (top section).
+- **Visibility**: Minimum 2 in-stock items, **Maximum 3 in-stock items** shown.
+- **Sorting Logic**:
+    1. Sort on **Best Value** (Price / Unit Ascending)
+    2. If Price / Unit is same → **SP Descending**
+
+#### Zone 2: Horizontal Listing (Explore Combos)
+Items listed in a horizontal row (bottom section).
+- **Header**: `{Brand} + {Product Type} + Combos`
+- **Visibility**: Minimum 3 in-stock items required to render. Horizontally scrollable.
+- **Rules applied to Quantity Variants**: If the selected item is a **Derived Child** (e.g., E), it cannot be part of any combos. Therefore, the Horizontal Listing **will not render** when the bottom sheet is opened for a Derived Child. It only renders when opened from the **Parent SKU** (e.g., A).
+- **Sorting Logic**:
+    1. Sort on **Best Value** ("% Off" Descending)
+    2. If "% Off" is same → **Price / Combo SKU Ascending**
+    3. If "% Off" & Price / Combo SKU same → **No Best Value SKU**
 
 > [!NOTE]
 > The logic to determine which items appear in the vertical vs. horizontal listing is based on relationship mapping, to be detailed in the next section.
 
 ## Relationship Mapping Logic
 
-To enable dynamic visibility and selection, variants are mapped into four distinct major types.
+To enable dynamic visibility and selection, variants are mapped into three distinct major types based on the above definitions.
 
-### 1. Packed Variants (Existing System)
-These are independent SKUs grouped together. Currently, they use a CSV upload:
+### 1. Quantity Variants (Derived)
+Every quantity variant is created from **one Parent SKU** via a **conversion factor**.
+
+- **Relationship**: Parent <-> Child. Dynamically managed; no manual grouping necessary. All parent and derived child SKUs automatically group together into the Primary Vertical list.
+- **Example**: Parent A (Potato 1kg) -> Derived Children E (500g), N (200g), S (2kg).
+- **Mapping Keys**:
+    - `grams|str`: `560g | 560g`
+    - `pack-size|str`: `400|g | 400 g`
+- **Button State Triggers**: Actioning on Parent A or Child E evaluates the exact same pool. If only A or only E is in stock, the button is a normal `[ADD]`. If 2 or more from the pool (A, E, N, S) are in stock, the button becomes `[ADD | {x} Options]`.
+- **Dynamic Handling**: Since these are derived, the `unit_value` should be explicitly calculated (`Parent.unit_value * conversion_factor`) and formatted using dynamic templates.
+- **Figma UI Specifics (Quantity)**:
+    - **Bottom Sheet Item Row**: Shows thumbnail, title (`1 kg`), Price H-Stack (`₹358` / `₹402`), and a separate `Price Breakdown Tag` below it (`₹11.6/100g`).
+    - **Highlight**: Best Value tag uses Blue text and Rupee badge icon.
+- **Derivation Chain Restriction**: A derived child SKU **cannot** be used as a parent to create further quantity variants or combo variants. For example, if E, N, S are derived from A: E, N, S cannot birth new SKUs. Parent A remains the only valid source for further derivations.
+
+---
+
+### 2. Combo Variants
+Created from **quantities of 1 or more Parent SKUs** to form a single Child SKU.
+
+- **Combo of same single SKU**:
+    - **Formula**: `Parent * Quantity = Child`.
+    - **Example**: Ghadi Detergent 1kg * 2 = 2kg Combo.
+    - **Identification**: Flagged as `COMBO_SAME` to represent bulk/multi-pack variants of the same product.
+- **Combo of >1 unique SKUs**:
+    - **Formula**: `(P1 * F1) + (P2 * F2) + ... = Child`.
+    - **Example**: `1 Lays + 1 Cold Drink + 1 Biscuit = 3 combo`.
+    - **Identification**: Flagged as `COMBO_DIFF`. Logic should allow for listing individual components within the combo or treating the combo as a single "style" or "bundle" variant.
+- **Limitations**:
+    - Conversion factor must be >= 1.
+    - Combos can only be created from original parent SKUs (no child SKUs as parents).
+
+#### Combo-Specific UI & Behaviors
+- **Button State Triggers**: Actioning on a combo (e.g., C1) pulls a pool of ALL combos that share at least one component with C1. If only C1 is in stock, it shows `[ADD]`. If 2 or more from this shared-component pool are in stock, it shows `[ADD | {x} Options]`.
+- **Bottom Sheet UI Details**:
+    - **Header**: `"Explore Combos"`
+    - **Price Logic**: If No Selling Price (SP) → Show **MRP**. (Note: Offer Price/OSP is currently **not allowed** on Combo variants).
+    - **Unit Display**:
+        - If combo contains **>1 unique SKUs**: `{Count Distinct SKU} + Combo` (e.g., `3 Combo`). The PDP title uses a `+` separator for ingredients: `A 1kg + B 200ml`. The unit tag is `| 3 Combo`.
+        - If combo contains **only 1 unique SKU**: `{unit_value} {unit} * {qty}` (e.g., `500g * 3` or `10ml * 2`).
+    - **Vertical Listing (Primary)**: Shows all in-stock related combos.
+    - **Horizontal Listing (Secondary)**: **Will NOT render** for Combo Variants. Horizontal listing is strictly for Standalone -> Combo exploration, never Combo -> Combo.
+- **Figma UI Specifics (Combo)**:
+    - **Horizontal Widget Details**: Item title (full component names joined by `+`), followed by H-stack containing Price + `"|"` + Unit tag. No Price Breakdown Tag is shown for combos.
+- **Sorting Logic (Vertical Listing)**:
+    1. Sort on **Best Value** ("% Off" Descending)
+    2. If "% Off" is same → **Price / Combo SKU Ascending**
+    3. If "% Off" & Price / Combo SKU same → **No Best Value SKU**
+- **Combo PDP specific requirements**:
+    - Display the combined variant image.
+    - Display a **"Combo Items"** section below the variants list, detailing all individual components.
+    - Each component row must show its item image, name, and individual SP/MRP.
+    - Each row is **clickable**, routing the user to the respective standalone PDP of that component.
+
+#### Shared Real-Time Inventory & Cart Limits (Combos)
+Combos consume inventory directly from their base components in real-time. Adding cross-combos draws from the exact same physical stock pool.
+- **The Math**: Combo C1 requires components A, B, C. Combo C2 requires components B, D.
+- **The Conflict**: If the store has 1000 units of A, C, D, but only **5 units of B**.
+- **The Live Constraint**: A user adds 4 quantities of C1 (consuming 4 units of B). They then add 1 quantity of C2 (consuming 1 further unit of B). The total available pool of B is now 0.
+- **Blocked Addition**: The user has exhausted component B. They cannot add any more C1 or C2. Attempting to click `[+]` on either will **block the addition** and trigger a snackbar stating: `"No more stock left to add"`.
+- *Note:* The user can navigate elsewhere and successfully add Standalone A, C, or D to the cart, but anything requiring B is locked.
+
+---
+
+### 3. Type Variants (Existing Packs)
+These are independent SKUs with existing packs grouped together. Currently, they use a CSV upload:
 `group_seed | item_code | key_1 | value_1 | display_name_1`
 
 - **group_seed**: Common identifier for the variant group.
-- **key_1**: Variant type (e.g., `color|hexcode`, `size|int`, `grams|str`, `pack-size|str`).
-- **display_name_1**: Static text shown on PDP (e.g., "560g", "Medium").
+- **Subtypes**:
+    - **Quantity type variants**: Items with weight variants (e.g., Ghadi Detergent 1kg, 2kg, 5kg).
+    - **Attribute type variants**: Items with attributes like colour, size, style (e.g., Shoes 6, 7, 9).
+- **Mapping Restrictions**: Manual mapping of these Standalone SKUs is strictly guarded. Items mapped together MUST have the exact same:
+    1. `product_type`
+    2. `brand`
+
+#### Allowed Mapping Keys (`key_1`)
+The UI handles presentation based on the specific template key used. The following keys are recognized:
+- `color|hexcode`: e.g., Phone, Headphone, Clothes, Bottles, Toys
+- `style|str`: e.g., Bags (Spiderman - Queen - Marvel)
+- `pattern-type|str`: e.g., Clothes (Plain - Printed)
+- `grams|str`: e.g., Apple (500g - 200g - 1kg)
+- `size|str`: e.g., Shoes (M - L - XL), Clothes (M - L - XL), Bottles (1L - 2L - 500ml)
+- `size|int`: e.g., Shoes (6 - 7 - 8), Clothes (36 - 38 - 40)
+- `pack-size|str`: e.g., Egg (3Pc - 1Pc), Diaper (6Pc - 12Pc - 24Pc)
+
+#### Type-Variant Specific UI & Behaviors
+- **Button State Triggers (on ATC of A)**:
+    - **Vertical Listing**: Shown if there are `>1 mapped` AND `>1 in-stock` variants in the group.
+    - **Horizontal Listing**: Shown if there are `>2 mapped` AND `>2 in-stock` combos containing A. Hidden if `<3 mapped` OR `<3 in-stock`.
+- **Figma UI Specifics (Type Variant)**:
+    - **Variant Selection Widget (Bottom Sheet)**: Instead of a generic row, categorical types display as a `PDP/Text Selection Item` grid (e.g., rectangular chips for `500g`, `1 kg`, `2 kg`).
+    - Chips contain the unit text in the center and the SP/MRP inside the chip box. 
+    - The Best Value Star/Rupee badge floats above the chip or sits immediately adjacent.
+- **Sorting Logic (Vertical Listing)**:
+    1. Sort on **Best Value** (Price / Unit Ascending)
+    2. If Price / Unit is same → **Selling Price Descending**
+    3. If Price / Unit & Selling Price same → **No Best Value SKU**
+- **Sorting Logic (Horizontal Listing)**:
+    1. Sort on **Best Value** ("% Off" Descending)
+    2. If "% Off" is same → **Price / Combo SKU Ascending**
+    3. If "% Off" & Price / Combo SKU same → **No Best Value SKU**
 
 #### 💡 Improvement: Dynamic Templates for Unit-Based Keys
 For keys that rely on physical measurements (e.g., `grams|str`, `pack-size|str`, `volume|str`), we can automate the display name:
@@ -257,49 +373,18 @@ For keys that rely on physical measurements (e.g., `grams|str`, `pack-size|str`,
 
 ---
 
-### 2. Loose Variants (Derived)
-Every loose variant is created from **one Parent SKU** via a **conversion factor**.
-
-- **Relationship**: Parent <-> Child.
-- **Example**: Parent (Potato 1kg) * 0.75 factor = Child (Potato 750g).
-- **Mapping Keys**:
-    - `color|hexcode`: `#899e8e | Light Green`
-    - `style|str`: `Captain America | Style`
-    - `grams|str`: `560g | 560g`
-- **Dynamic Handling**: Since these are derived, the `unit_value` should be explicitly calculated (`Parent.unit_value * conversion_factor`) and formatted using the templates above.
-
----
-
-### 3. Combo Variants (Same SKU)
-Created from **multiple quantities of a single Parent SKU** to form a single Child SKU.
-
-- **Formula**: `Parent * Quantity = Child`.
-- **Example**: Potato 1kg * 2 = Potato 2kg Combo.
-- **Identification**: These must be flagged as `COMBO_SAME` to distinguish them from different-item combos, as they represent bulk/multi-pack variants of the same product.
-
----
-
-### 4. Combo Variants (Different SKUs)
-Created from a **mix of multiple Parent SKUs** to form a single Child SKU.
-
-- **Formula**: `(P1 * F1) + (P2 * F2) + ... = Child`.
-- **Example**: `Milk 500ml + Bread 400g + Egg 3pc`.
-- **Identification**: Flagged as `COMBO_DIFF`. Logic should allow for listing individual components within the combo or treating the combo as a single "style" or "bundle" variant.
-
----
-
 ## Data Maintenance & Feeding Strategy
 
 ### A. Unified Variant Metadata Model
 Instead of type-specific tables, use a central `ProductVariantMapping` model with an `origin_type` ENUM:
-- `FIXED_PACK` (Type 1)
-- `DERIVED_LOOSE` (Type 2)
-- `COMBO_SAME` (Type 3)
-- `COMBO_DIFF` (Type 4)
+- `QUANTITY_DERIVED` (Type 1)
+- `COMBO_SAME` (Type 2a)
+- `COMBO_DIFF` (Type 2b)
+- `TYPE_VARIANT_FIXED` (Type 3)
 
 ### B. Intelligent Auto-Grooming
-1. **Packed Variant Creator**: When a user uploads a `group_seed`, the system auto-fetches `unit`/`unit_value` for all `item_codes` and suggests the `key_1` and `display_name`.
-2. **Derived Variant Listener**: When a new Derived SKU is created in Samaan (Parent-Child relationship), the system automatically adds it to the variant group of the Parent.
+1. **Type Variant Creator**: When a user uploads a `group_seed`, the system auto-fetches `unit`/`unit_value` for all `item_codes` and suggests the `key_1` and `display_name`.
+2. **Quantity Variant Listener**: When a new Derived SKU is created in Samaan (Parent-Child relationship), the system automatically adds it to the variant group of the Parent.
 3. **Combo Registry**: All combo creations should automatically register their parents in the mapping table to enable "Explore Combos" visibility on the Parent PDP.
 
 ## Rendering & Visibility Logic
@@ -311,9 +396,11 @@ The app uses a gatekeeper logic to determine when to show options and how to ren
 - **Primary Section (Vertical Listing)**:
     - **Source**: All items sharing the same `group_seed` as the selected item.
     - **Role**: Primary variants (Size, Color, etc.).
+    - **Display Limits**: Minimum 2 in-stock items, **Maximum 3 in-stock items** shown.
 - **Secondary Section (Horizontal Listing)**:
     - **Source**: All combos that contain the selected item as a parent component.
     - **Role**: "Explore Combos" or bundle offers.
+    - **Display Limits**: Minimum 3 in-stock items required to render. The section is horizontally scrollable if there are more than 3 items.
 
 ### 2. Visibility & Trigger Rules (The Gatekeeper)
 
@@ -325,7 +412,18 @@ The display of the `[ADD | {x} OPTIONS]` button and the Bottom Sheet is governed
 | **P2** | > 1 items | < 3 items | **[ADD | {x} OPTIONS]** Button. Bottom Sheet shows **Vertical Listing only**. |
 | **P3** | > 1 items | >= 3 items | **[ADD | {x} OPTIONS]** Button. Bottom Sheet shows **Vertical + Horizontal Listing**. |
 
-### 3. Critical Business Rules
+### 3. Shared Real-Time Inventory & Cart Limits
+Because Quantity Variants and Combo Variants draw from the exact same physical warehouse inventory, adding items to the cart across different variants consumes from a **single pooled budget**.
+
+- **The Math**: If Store has 10kg total of A (1kg units). This means 10 physical units of A exist. Simultaneously, this means 20 available units of E (0.5kg) exist. The total pooled mass is 10kg.
+- **The Live Constraint (Add To Cart Action)**: If pooled quantity for requested variants < total available qty, allow the addition. If pooled quantity > total available qty, block the ATC action and show a bottom snackbar stating: `"No more stock left to add"`.
+- **Live State Recalculation (Cart Page Auto-Reduction)**: This shared limit applies across all active users.
+    - Example: If Customer X has added all available stock of A to their cart, but Customer Y buys 1 quantity of A.
+    - Customer X's cart is automatically evaluated and the quantity of A is reduced by 1.
+    - An error state message is appended to the exact item in the cart: `"1 qty removed due to low availability"`.
+    - If the item's available pool hits 0, it drops to a disabled state with an `"Out of stock"` label.
+
+### 4. Critical Business Rules
 
 1.  **Primary is Mandatory**: The bottom sheet **will NOT open** if the Primary section has 1 or fewer in-stock variants, even if multiple combos exist. It needs **at least 2 items** in stock to show.
 2.  **Secondary Threshold**: The Secondary section (Horizontal Listing) requires a minimum of **3 in-stock items** to render. It needs **at least 3 items** in stock to show. If count < 3, the section is suppressed entirely.
@@ -342,8 +440,27 @@ The display of the `[ADD | {x} OPTIONS]` button and the Bottom Sheet is governed
     * Displaying "0 units available" if the remaining parent is less than a child unit.
     * Flagging small remainders for manual reconciliation.
 5.  **Actual Weight Tracking:** For picking, consider implementing actual weight capture at the POS/picking station to accurately deduct from parent inventory. If not feasible, an estimated average weight for the Child SKU should be used, with a clear understanding of potential discrepancies.
-6.  **Backorder/Partial Fulfillment Logic:** How should the system respond when an order can't be fully fulfilled due to sudden inventory changes during picking?
+6.  **Backorder/Partial Fulfillment Logic:** How should the system respond when an order can't be fully fulfilled due to sudden inventory changes during picking? (Addressed in Post-Order Partial Cancellation).
 7.  **Auditing and Reconciliation:** Tools for store staff to easily audit current inventory, identify discrepancies, and reconcile actual vs. system inventory.
 8.  **User Interface Considerations:** Clearly communicate to users (both store staff and online customers) the implications of variable weights and potential partial availability. For example, "Approximately X units available."
 
+## Post-Order Partial Cancellation (Combo Breakdown)
+
+If a user orders a Combo Variant, but one or more of its child SKUs get cancelled post-order (due to actual store unavailability, damage, expiration, etc.), the combo undergoes a **partial cancellation breakdown**.
+
+- **Breakdown Logic**: Post-order, the combo breaks down into its individual component SKUs. Pricing for each component is calculated strictly as per its defined `price multiplier` in the combo setup.
+- **Example Scenario**:
+    - **Order**: Combo C1 (contains A, B, C).
+    - **Event**: Component B goes Out of Stock during store picking and is cancelled.
+    - **Order Details View (CX App)**:
+        - The original Combo C1 is no longer shown as a single bundled item.
+        - The active item list will now independently show **A** and **C** as individual products.
+        - The Updated/Cancelled items section will show **B** as the cancelled product.
+    - **Financial Sync**: The prices for A, B, and C are calculated individually using the price multiplier.
+        - **COD Orders**: The customer pays the reduced, re-calculated amount (Total - Cancelled B).
+        - **Prepaid Orders**: The customer is refunded the exact calculated amount of the cancelled item B.
+
+---
+
+## Conclusion
 By considering these exhaustive scenarios, developers can design a robust and reliable inventory management system that addresses the complexities of re-packaging, fractional quantities, and multi-channel sales.
